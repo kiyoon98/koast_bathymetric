@@ -77,7 +77,6 @@ class KoastTalker(object):
 
         if len(self.pcd_files) > 0:
             if self.counter < len(self.pcd_files):
-                
                 # load() or load_XYZRGB() - /usr/lib/python3/dist-packages/pcl/__init__.py
                 p = pcl.load_XYZRGB(self.pcd_files[self.counter], format="pcd")
                 a = np.asarray(p)
