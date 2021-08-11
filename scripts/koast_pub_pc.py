@@ -77,20 +77,57 @@ class KoastTalker(object):
 
         if len(self.pcd_files) > 0:
             if self.counter < len(self.pcd_files):
-                # load() or load_XYZRGB() - /usr/lib/python3/dist-packages/pcl/__init__.py
-                p = pcl.load_XYZRGB(self.pcd_files[self.counter], format="pcd")
+                # Read the PCD file to get the details of the file
+                pcd = open(self.pcd_files[0], 'rb')
+                lines = pcd.readlines(200)
+                for line in lines:
+                    l = line.decode("utf-8", "ignore")
+                    l = l.strip()
+                    if l.upper().startswith("FIELDS"):
+                        fields_str = l.split()[1:]
+                    elif l.upper().startswith("TYPE"):
+                        type_str = l.split()[1:]
+                    elif l.upper().startswith("SIZE"):
+                        size_str = l.split()[1:]
+                    elif l.upper().startswith("COUNT"):
+                        count_str = l.split()[1:]
+
+                print(fields_str, end="--")
+                print(type_str)
+                
+                pcd.close()
+
+                fields = []
+                offset = 0
+                for i in range(len(fields_str)):
+                    if type_str[i] == 'U':
+                        pf_type = PointField.UINT32
+                    else:
+                        pf_type = PointField.FLOAT32
+                    
+                    if (i < 3) or fields_str[i].startswith("rgb") or fields_str[i] == "i":
+                        one_field = PointField(fields_str[i], offset, pf_type, int(count_str[i]))
+                        fields.append(one_field)
+
+                    offset += int(size_str[i])
+
+                # load(), load_XYZRGB(), load_XYZRGBA(), or load_XYZI() - /usr/lib/python3/dist-packages/pcl/__init__.py
+                if len(fields) > 3:
+                    if fields_str[3] == "rgb":
+                        p = pcl.load_XYZRGB(self.pcd_files[self.counter], format="pcd")
+                    elif fields_str[3] == "rgba":
+                        p = pcl.load_XYZRGBA(self.pcd_files[self.counter], format="pcd")
+                    elif fields_str[3] == "i":
+                        p = pcl.load_XYZI(self.pcd_files[self.counter], format="pcd")
+                else:
+                    p = pcl.load(self.pcd_files[self.counter], format="pcd")
+
                 a = np.asarray(p)
-                # print(type(p))
                 # print(p.width, "x", p.height, "size=", p.__str__)
                 header = std_msgs.msg.Header()
-                # fields is needed when create_cloud() is used
-                # in create_cloud_xyz32(), fields is created as following
-                fields = [PointField('x', 0, PointField.FLOAT32, 1),
-                    PointField('y', 4, PointField.FLOAT32, 1),
-                    PointField('z', 8, PointField.FLOAT32, 1),
-                    PointField('rgb', 12, PointField.FLOAT32, 1)]
 
-                # create_cloud_xyz32() returns a PointCloud2 msg
+                # fields is needed when create_cloud() is used
+                # c.f. create_cloud_xyz32() is when oply x, y, z
                 pc = pc2.create_cloud(header, fields, a)
 
                 # Make the PointCloud organized by assigning width & height

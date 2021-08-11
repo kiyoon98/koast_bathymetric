@@ -14,7 +14,7 @@ def callback(data):
 #    print (msg)
     rospy.loginfo(msg)
     # Process data.pc (PointCloud2)
-    print(data.pc.width, data.pc.height, data.pc.fields)
+    print(data.pc.width, data.pc.height, "# fields=", len(data.pc.fields))
 
 def listener():
     rospy.init_node('koast_listener', anonymous=False)
