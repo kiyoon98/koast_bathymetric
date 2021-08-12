@@ -13,7 +13,7 @@ import pcl.pcl_visualization
 
 import numpy as np
 
-
+'''
 class AppState:
 
     def __init__(self, *args, **kwargs):
@@ -215,6 +215,9 @@ h = 480
 
 out = np.empty((h, w, 3), dtype=np.uint8)
 
+''' 
+###### Ignore up to this point
+
 a = 220
 b = 120
 c = 100
@@ -303,8 +306,8 @@ def listener():
     rospy.spin()
 
 if __name__ == '__main__':
-    cv2.namedWindow(state.WIN_NAME, cv2.WINDOW_AUTOSIZE)
-    cv2.resizeWindow(state.WIN_NAME, w, h)
-    cv2.setMouseCallback(state.WIN_NAME, mouse_cb)
+    # cv2.namedWindow(state.WIN_NAME, cv2.WINDOW_AUTOSIZE)
+    # cv2.resizeWindow(state.WIN_NAME, w, h)
+    # cv2.setMouseCallback(state.WIN_NAME, mouse_cb)
 
     listener()
