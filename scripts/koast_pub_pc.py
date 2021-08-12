@@ -34,7 +34,6 @@ class KoastTalker(object):
 
         self.pcd_files = []
         self.pipe = rs.pipeline()
-
         if input_dir != "":
             files = subprocess.Popen("ls " + input_dir + "*.pcd", shell=True, stdout=subprocess.PIPE).stdout.read()
             # print(files)
@@ -53,7 +52,7 @@ class KoastTalker(object):
         else:
             self.stop()
         
-        rate = 0.333
+        rate = 1
         rospy.Timer(rospy.Duration(1.0/rate), self.timer_cb)
 
     def start(self):
@@ -69,13 +68,15 @@ class KoastTalker(object):
             return
 
         msg = KoastMessage()
-        pc_msg = PointCloud2()
+        # pc_msg = PointCloud2()
 
         timestr = strftime("%H:%M:%S", localtime())
         msg.header.frame_id = "F-" + str(self.counter) + "(" + timestr + ")"
         msg.header.stamp = rospy.Time.now()
+        pc_header = std_msgs.msg.Header()
 
         if len(self.pcd_files) > 0:
+            # A folder with pcd files is provided as an argument
             if self.counter < len(self.pcd_files):
                 # Read the PCD file to get the details of the file
                 pcd = open(self.pcd_files[0], 'rb')
@@ -124,11 +125,10 @@ class KoastTalker(object):
 
                 a = np.asarray(p)
                 # print(p.width, "x", p.height, "size=", p.__str__)
-                header = std_msgs.msg.Header()
 
                 # fields is needed when create_cloud() is used
                 # c.f. create_cloud_xyz32() is when oply x, y, z
-                pc = pc2.create_cloud(header, fields, a)
+                pc = pc2.create_cloud(pc_header, fields, a)
 
                 # Make the PointCloud organized by assigning width & height
                 pc.width = p.width
@@ -138,25 +138,61 @@ class KoastTalker(object):
                 rospy.loginfo("PCD " + str(self.counter) + " (" + self.pcd_files[self.counter] + ") is processed and published")
                 self.pc_pub.publish(pc)
             else:
-                rospy.loginfo("All PCD files have been processed")
+                rospy.loginfo("All PCD files have been processed. Resetting the counter.")
+                self.counter = 0
         else:
+            # No PCD files: PointCloud data come from the depth camera
             msg.message = rospy.get_param("~message", self.message)
             msg.a = rospy.get_param("~a", self.int_a)
             msg.b = rospy.get_param("~b", self.int_b)
 
             frames = self.pipe.wait_for_frames()
             depth_frame = frames.get_depth_frame()
-            '''
-            for f in frames:
-                print(f.profile)
-            '''
-            # rospy.loginfo(depth_frame.profile)
+            # decimate = rs.decimation_filter()
+            # depth_frame = decimate.process(depth_frame)
+
+            rospy.loginfo(depth_frame.profile)
             depth_data = depth_frame.get_data()
             depth_image = np.asanyarray(depth_data)
-            rospy.loginfo(type(frames))
-            rospy.loginfo(type(depth_frame))
-            rospy.loginfo(type(depth_data))
-            rospy.loginfo(type(depth_image))
+
+            # rospy.loginfo(type(frames))
+            # rospy.loginfo(type(depth_frame))
+            # rospy.loginfo(type(depth_data))
+            # rospy.loginfo(type(depth_image))
+
+            ''' 
+                (class) PointCloud2(*args, **kwds)
+                Constructor. Any message fields that are implicitly/explicitly set to None will be assigned a default value. The recommend use is keyword arguments as this is more robust to future message changes. You cannot mix in-order arguments and keyword arguments.
+
+                The available fields are:
+                header,height,width,fields,is_bigendian,point_step,row_step,data,is_dense
+
+                :param args: complete set of field values, in .msg order
+                :param kwds: use keyword arguments corresponding to message field names to set specific fields.
+            '''
+
+            # Grab new intrinsics (may be changed by decimation)
+            depth_intrinsics = rs.video_stream_profile(depth_frame.profile).get_intrinsics()
+            w, h = depth_intrinsics.width, depth_intrinsics.height
+            fields = [PointField('x', 0, PointField.FLOAT32, 1),
+                PointField('y', 4, PointField.FLOAT32, 1),
+                PointField('z', 8, PointField.FLOAT32, 1)]
+
+            rs_pc = rs.pointcloud()
+            points = rs_pc.calculate(depth_frame)
+            v, t = points.get_vertices(), points.get_texture_coordinates()
+            #pc.map_to(mapped_frame)
+            
+            rospy.loginfo("Dim = ({0:d}, {1:d}), dpeth_frame.get_data size={2:d}, bytes_per_pixel={3:d}, points.get_data_size()={4:d}".format(
+                w, h, depth_frame.get_data_size(), depth_frame.bytes_per_pixel, points.get_data_size()))
+            v_a = np.asarray(v)
+            t_a = np.asarray(t)
+
+            pc = pc2.create_cloud(pc_header, fields, v_a)
+            pc.width = w
+            pc.height = h
+
+            msg.pc = pc
 
         self.pub.publish(msg)
         self.counter += 1

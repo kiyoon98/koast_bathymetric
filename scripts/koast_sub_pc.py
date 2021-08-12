@@ -9,6 +9,7 @@ import rospy
 import std_msgs.msg
 from koast_bathymetric.msg import KoastMessage
 import pcl
+import pcl.pcl_visualization
 
 import numpy as np
 
@@ -214,17 +215,86 @@ h = 480
 
 out = np.empty((h, w, 3), dtype=np.uint8)
 
+a = 220
+b = 120
+c = 100
+
+#viewer = pcl.pcl_visualization.PCLVisualizering()
+viewer = pcl.pcl_visualization.CloudViewing()
+
 def callback(data):
-    # print (rospy.get_name(), "I heard %s"%str(data.header), end=" ")
     now = data.header.stamp
     msg = "Pub [{0:7d}.{1:7d}] [{2:s}]".format(now.secs, now.nsecs, data.header.frame_id)
-#    print (msg)
     rospy.loginfo(msg)
-    # Process data.pc (PointCloud2)
+    print(type(data.pc.data), len(data.pc.data))
     print(data.pc.width, data.pc.height, "# fields=", len(data.pc.fields))
 
-    depth_image = np.asanyarray(data.pc.data)
+    # Process data.pc (PointCloud2)
 
+    if len(data.pc.fields) == 3:
+        cloud = pcl.PointCloud(data.pc.width * data.pc.height)
+        cloud.from_array(np.ndarray(shape=(data.pc.width*data.pc.height, 3),
+                            dtype=np.float32, buffer=data.pc.data))
+        # cloud_filtered = cloud
+    else:
+        cloud = pcl.PointCloud_PointXYZRGB(data.pc.width * data.pc.height)
+        cloud.from_array(np.ndarray(shape=(data.pc.width*data.pc.height, 4),
+                            dtype=np.float32, buffer=data.pc.data))
+
+    i = 0.1 * a
+    j = 0.1 * b
+    k = 0.1 * c
+
+    # Printing to ensure that the passthrough filter values are changing if we move trackbars.
+    # cout << "i = " << i << " j = " << j << " k = " << k << endl;
+    print("i = " + str(i) + " j = " + str(j) + " k = " + str(k))
+
+    # Applying passthrough filters with XYZ limits
+    # pcl::PassThrough<pcl::PointXYZRGBA> pass;
+    # pass.setInputCloud (cloud);
+    # pass.setFilterFieldName ("y");
+    # //  pass.setFilterLimits (-0.1, 0.1);
+    # pass.setFilterLimits (-k, k);
+    # pass.filter (*cloud);
+    pass_th = cloud.make_passthrough_filter()
+    pass_th.set_filter_field_name("y")
+    pass_th.set_filter_limits(-k, k)
+    cloud = pass_th.filter()
+
+    # pass.setInputCloud (cloud);
+    # pass.setFilterFieldName ("x");
+    # // pass.setFilterLimits (-0.1, 0.1);
+    # pass.setFilterLimits (-j, j);
+    # pass.filter (*cloud);
+    # pass_th.setInputCloud(cloud)
+    pass_th.set_filter_field_name("x")
+    pass_th.set_filter_limits(-j, j)
+    cloud = pass_th.filter()
+
+    # pass.setInputCloud (cloud);
+    # pass.setFilterFieldName ("z");
+    # //  pass.setFilterLimits (-10, 10);
+    # pass.setFilterLimits (-i, i);
+    # pass.filter (*cloud);
+    # pass_th.setInputCloud(cloud)
+    pass_th.set_filter_field_name("z")
+    pass_th.set_filter_limits(-10, 10)
+    cloud = pass_th.filter()
+
+    if len(data.pc.fields) == 3:
+        # // Visualizing pointcloud
+        # viewer.addPointCloud (cloud, "scene_cloud");
+        # viewer.spinOnce();
+        # viewer.removePointCloud("scene_cloud");
+
+        viewer.ShowMonochromeCloud(cloud, b'cloud')
+
+        ###viewer.AddPointCloud(cloud, b'scene_cloud', 0)
+        ###viewer.SpinOnce()
+        # viewer.Spin()
+        ###viewer.RemovePointCloud(b'scene_cloud', 0)
+    else:
+        viewer.ShowColorCloud(cloud)
 
 def listener():
     rospy.init_node('koast_listener', anonymous=False)
