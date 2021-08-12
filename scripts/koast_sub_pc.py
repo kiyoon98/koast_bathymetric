@@ -226,7 +226,8 @@ def callback(data):
     now = data.header.stamp
     msg = "Pub [{0:7d}.{1:7d}] [{2:s}]".format(now.secs, now.nsecs, data.header.frame_id)
     rospy.loginfo(msg)
-    print(type(data.pc.data), len(data.pc.data))
+    # print(type(data.pc.data), len(data.pc.data))
+    print(data.message)
     print(data.pc.width, data.pc.height, "# fields=", len(data.pc.fields))
 
     # Process data.pc (PointCloud2)
@@ -247,7 +248,7 @@ def callback(data):
 
     # Printing to ensure that the passthrough filter values are changing if we move trackbars.
     # cout << "i = " << i << " j = " << j << " k = " << k << endl;
-    print("i = " + str(i) + " j = " + str(j) + " k = " + str(k))
+    # print("i = " + str(i) + " j = " + str(j) + " k = " + str(k))
 
     # Applying passthrough filters with XYZ limits
     # pcl::PassThrough<pcl::PointXYZRGBA> pass;

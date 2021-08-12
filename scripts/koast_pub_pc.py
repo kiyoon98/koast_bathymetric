@@ -68,7 +68,9 @@ class KoastTalker(object):
             return
 
         msg = KoastMessage()
-        # pc_msg = PointCloud2()
+        # msg.message = rospy.get_param("~message", self.message)
+        # msg.a = rospy.get_param("~a", self.int_a)
+        # msg.b = rospy.get_param("~b", self.int_b)
 
         timestr = strftime("%H:%M:%S", localtime())
         msg.header.frame_id = "F-" + str(self.counter) + "(" + timestr + ")"
@@ -78,6 +80,7 @@ class KoastTalker(object):
         if len(self.pcd_files) > 0:
             # A folder with pcd files is provided as an argument
             if self.counter < len(self.pcd_files):
+                msg.message = "Data from " + self.pcd_files[self.counter]
                 # Read the PCD file to get the details of the file
                 pcd = open(self.pcd_files[0], 'rb')
                 lines = pcd.readlines(200)
@@ -110,7 +113,7 @@ class KoastTalker(object):
                         one_field = PointField(fields_str[i], offset, pf_type, int(count_str[i]))
                         fields.append(one_field)
 
-                    offset += int(size_str[i])
+                    offset += int(size_str[i])*int(count_str[i])
 
                 # load(), load_XYZRGB(), load_XYZRGBA(), or load_XYZI() - /usr/lib/python3/dist-packages/pcl/__init__.py
                 if len(fields) > 3:
@@ -142,9 +145,7 @@ class KoastTalker(object):
                 self.counter = 0
         else:
             # No PCD files: PointCloud data come from the depth camera
-            msg.message = rospy.get_param("~message", self.message)
-            msg.a = rospy.get_param("~a", self.int_a)
-            msg.b = rospy.get_param("~b", self.int_b)
+            msg.message = "Data from Intel ReseSense D455"
 
             frames = self.pipe.wait_for_frames()
             depth_frame = frames.get_depth_frame()
@@ -152,13 +153,11 @@ class KoastTalker(object):
             # depth_frame = decimate.process(depth_frame)
 
             rospy.loginfo(depth_frame.profile)
-            depth_data = depth_frame.get_data()
-            depth_image = np.asanyarray(depth_data)
+            # depth_data = depth_frame.get_data()
+            # depth_image = np.asanyarray(depth_data)
 
-            # rospy.loginfo(type(frames))
-            # rospy.loginfo(type(depth_frame))
-            # rospy.loginfo(type(depth_data))
-            # rospy.loginfo(type(depth_image))
+            color_frame = frames.get_color_frame()
+            color_image = np.asanyarray(color_frame.get_data())
 
             ''' 
                 (class) PointCloud2(*args, **kwds)
@@ -171,22 +170,25 @@ class KoastTalker(object):
                 :param kwds: use keyword arguments corresponding to message field names to set specific fields.
             '''
 
-            # Grab new intrinsics (may be changed by decimation)
+            # Grab the intrinsics (may be changed by decimation)
             depth_intrinsics = rs.video_stream_profile(depth_frame.profile).get_intrinsics()
             w, h = depth_intrinsics.width, depth_intrinsics.height
+            # Although there is color image input, the resolution is different and needs mathematical processing to overlay
+            # So, publish onlu PointCloud with out rgb
             fields = [PointField('x', 0, PointField.FLOAT32, 1),
                 PointField('y', 4, PointField.FLOAT32, 1),
                 PointField('z', 8, PointField.FLOAT32, 1)]
 
+            # depth_frame is a 2 dimensional data. Let's create 3D pointcloud using pointcloud class
             rs_pc = rs.pointcloud()
             points = rs_pc.calculate(depth_frame)
+            # Once 3D points are created, get vertices!
             v, t = points.get_vertices(), points.get_texture_coordinates()
-            #pc.map_to(mapped_frame)
             
             rospy.loginfo("Dim = ({0:d}, {1:d}), dpeth_frame.get_data size={2:d}, bytes_per_pixel={3:d}, points.get_data_size()={4:d}".format(
                 w, h, depth_frame.get_data_size(), depth_frame.bytes_per_pixel, points.get_data_size()))
-            v_a = np.asarray(v)
-            t_a = np.asarray(t)
+            v_a = np.asanyarray(v).view(np.float32).reshape(-1, 3)
+            t_a = np.asanyarray(t).view(np.float32).reshape(-1, 2)
 
             pc = pc2.create_cloud(pc_header, fields, v_a)
             pc.width = w
