@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# This program is based on opencv_pointcloud_viewer.py in PyRealSense2 (https://dev.intelrealsense.com/docs/python2) and
+# simple_visualize.py, example.py, visualization.py in python-pcl (https://github.com/strawlab/python-pcl)
+
 PKG = 'koast_bathymetric'
 import roslib; roslib.load_manifest(PKG)
 
